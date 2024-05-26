@@ -72,7 +72,6 @@ int main(int argc, char *argv[]) {
     else if (strcmp(argv[i], "-c") == 0) {
       if (i + 1 < argc) {
         inventory.campFile = argv[++i];
-        printf("Camp log option detected: %s\n", inventory.campFile);
         FILE *file = fopen(inventory.campFile, "a");
         if (file != NULL) {
           fclose(file);
@@ -113,9 +112,10 @@ void printUsage(void) {
 
 int isValidCoin(const char *unit) {
   // validate coins
-  return strcmp(unit, "cp") == 0 || strcmp(unit, "sp") == 0 ||
-         strcmp(unit, "ep") == 0 || strcmp(unit, "gp") == 0 ||
-         strcmp(unit, "pp") == 0;
+  strcmp(unit, "cp") == 0 || strcmp(unit, "sp") == 0 ||
+      strcmp(unit, "ep") == 0 || strcmp(unit, "gp") == 0 ||
+      strcmp(unit, "pp") == 0;
+  return 1;
 }
 
 int EquipmentFile(char *fileName, struct Inventory *inventory, int itemCount) {
@@ -200,38 +200,38 @@ void addEquipment(struct Inventory *inventory, struct Equipment *newEquipment,
     return;
   }
 
-  struct Equipment *copiedEquipment = malloc(sizeof(struct Equipment));
-  if (copiedEquipment == NULL) {
-    printf("Memory allocation failed.\n");
-    return;
-  }
-  memcpy(copiedEquipment, newEquipment, sizeof(struct Equipment));
-  copiedEquipment->itemCount = itemCount;
+  // Calculate the weight of the new equipment
+  double newWeight = newEquipment->weight * itemCount;
 
-  // Check if adding this equipment exceeds the maximum weight
-  double newWeight = copiedEquipment->weight * itemCount;
+  // Check if adding this equipment would exceed the maximum weight
   if (inventory->currentWeight + newWeight > inventory->maxWeight) {
-    printf("Player is encumbered. Cannot add equipment '%s'.\n",
-           copiedEquipment->name);
-    free(copiedEquipment);
-    return;
+    printf("Warning: Adding equipment '%s' would exceed maximum weight. Player "
+           "is encumbered.\n",
+           newEquipment->name);
   }
 
-  // Add the equipment to the inventory
+  // Add the equipment to the inventory without copying
+  newEquipment->itemCount = itemCount;
+  newEquipment->next = NULL;
+  newEquipment->prev = NULL;
+
   if (inventory->equipment == NULL) {
-    inventory->equipment = copiedEquipment;
-    copiedEquipment->next = copiedEquipment;
-    copiedEquipment->prev = copiedEquipment;
+    inventory->equipment = newEquipment;
+    newEquipment->next = newEquipment;
+    newEquipment->prev = newEquipment;
   } else {
     struct Equipment *lastEquipment = inventory->equipment->prev;
-    lastEquipment->next = copiedEquipment;
-    copiedEquipment->prev = lastEquipment;
-    copiedEquipment->next = inventory->equipment;
-    inventory->equipment->prev = copiedEquipment;
+    lastEquipment->next = newEquipment;
+    newEquipment->prev = lastEquipment;
+    newEquipment->next = inventory->equipment;
+    inventory->equipment->prev = newEquipment;
   }
 
   // Update the total weight
   inventory->currentWeight += newWeight;
+
+  // Print the current weight
+  printf("Current weight: %.2f\n", inventory->currentWeight);
 }
 
 void freeInventory(struct Inventory *inventory) {
@@ -247,27 +247,75 @@ void freeInventory(struct Inventory *inventory) {
 void printInventory(struct Inventory *inventory) {
   printf("\nPlayer's Inventory:\n");
 
-  // Print coins
-  printf("Coins:\n");
-  for (int i = 0; i < 5; i++) {
-    printf("%d %s\n", inventory->coins[i].quantity, inventory->coins[i].unit);
+  // Print warning if encumbered
+  if (inventory->currentWeight > inventory->maxWeight) {
+    printf("Warning: Player is encumbered. Current weight (%.2f) exceeds "
+           "maximum weight (%.2f).\n",
+           inventory->currentWeight, inventory->maxWeight);
   }
 
-  // Print equipment
-  printf("Equipment:\n");
-  struct Equipment *current = inventory->equipment;
+  // Print initial coins
+  printf("Initial Coins:\n");
+  for (int i = 0; i < 5; i++) {
+    if (inventory->coins[i].quantity > 0) {
+      printf("%d %s\n", inventory->coins[i].quantity, inventory->coins[i].unit);
+    }
+  }
+
+  // Conversion rates
+  const int CP_PER_SP = 10;
+  const int SP_PER_EP = 5;
+  const int EP_PER_GP = 2;
+  const int GP_PER_PP = 10;
+
+  // Accumulate item values in copper pieces
+  int totalCopper = 0;
   double totalWeight = 0.0;
-  if (current == NULL) {
+  struct Equipment *currentEquipment = inventory->equipment;
+  if (currentEquipment == NULL) {
     printf("No equipment\n");
   } else {
+    struct Equipment *startEquipment =
+        currentEquipment; // Remember the starting point
     do {
+      if (strcmp(currentEquipment->coins.unit, "cp") == 0) {
+        totalCopper +=
+            currentEquipment->coins.quantity * currentEquipment->itemCount;
+      } else if (strcmp(currentEquipment->coins.unit, "sp") == 0) {
+        totalCopper += currentEquipment->coins.quantity * CP_PER_SP *
+                       currentEquipment->itemCount;
+      } else if (strcmp(currentEquipment->coins.unit, "ep") == 0) {
+        totalCopper += currentEquipment->coins.quantity * CP_PER_SP *
+                       SP_PER_EP * currentEquipment->itemCount;
+      } else if (strcmp(currentEquipment->coins.unit, "gp") == 0) {
+        totalCopper += currentEquipment->coins.quantity * CP_PER_SP *
+                       SP_PER_EP * EP_PER_GP * currentEquipment->itemCount;
+      } else if (strcmp(currentEquipment->coins.unit, "pp") == 0) {
+        totalCopper += currentEquipment->coins.quantity * CP_PER_SP *
+                       SP_PER_EP * EP_PER_GP * GP_PER_PP *
+                       currentEquipment->itemCount;
+      }
       printf("Name: %s, Weight: %.2f, Item Count: %d, Cost: %d %s\n",
-             current->name, current->weight, current->itemCount,
-             current->coins.quantity, current->coins.unit);
-      totalWeight += current->weight * current->itemCount;
-      current = current->next;
-    } while (current != inventory->equipment);
+             currentEquipment->name, currentEquipment->weight,
+             currentEquipment->itemCount, currentEquipment->coins.quantity,
+             currentEquipment->coins.unit);
+      totalWeight += currentEquipment->weight * currentEquipment->itemCount;
+      currentEquipment = currentEquipment->next;
+    } while (currentEquipment != startEquipment);
   }
+
+  // Breakdown total copper into pp, gp, ep, sp, and cp
+  int pp = totalCopper / (CP_PER_SP * SP_PER_EP * EP_PER_GP * GP_PER_PP);
+  totalCopper %= (CP_PER_SP * SP_PER_EP * EP_PER_GP * GP_PER_PP);
+  int gp = totalCopper / (CP_PER_SP * SP_PER_EP * EP_PER_GP);
+  totalCopper %= (CP_PER_SP * SP_PER_EP * EP_PER_GP);
+  int ep = totalCopper / (CP_PER_SP * SP_PER_EP);
+  totalCopper %= (CP_PER_SP * SP_PER_EP);
+  int sp = totalCopper / CP_PER_SP;
+  int cp = totalCopper % CP_PER_SP;
+
+  printf("Total Value of Items: %d pp, %d gp, %d ep, %d sp, %d cp\n", pp, gp,
+         ep, sp, cp);
   printf("Total Weight: %.2f\n", totalWeight);
 }
 
@@ -281,12 +329,11 @@ void manageInventory(struct Inventory *inventory) {
     printf("2. Transfer equipment from camp to player\n");
     printf("3. Check next equipment in player inventory\n");
     printf("4. Check previous equipment in player inventory\n");
-    printf("5. List camp's equipment\n");
     printf("6. Exit inventory\n");
     printf("Choose an option: ");
 
     int result = scanf("%d", &option);
-    if (result != 1 || option < 1 || option > 6) {
+    if (result != 1 || option < 1 || option > 5) {
       printf("Invalid input. Please enter a number between 1 and 6.\n");
       while (getchar() != '\n')
         continue;
@@ -346,43 +393,14 @@ void manageInventory(struct Inventory *inventory) {
         while (fscanf(campFileRead,
                       " Name:%63s Item count:%d Weight:%lf Cost:%d %2s\n", name,
                       &itemCount, &weight, &quantity, unit) == 5) {
-          struct Equipment *newEquipment = malloc(sizeof(struct Equipment));
-          if (newEquipment != NULL) {
-            strcpy(newEquipment->name, name);
-            newEquipment->itemCount = itemCount;
-            newEquipment->weight = weight;
-            newEquipment->coins.quantity = quantity;
-            strcpy(newEquipment->coins.unit, unit);
+          struct Equipment newEquipment = {0};
+          strcpy(newEquipment.name, name);
+          newEquipment.itemCount = itemCount;
+          newEquipment.weight = weight;
+          newEquipment.coins.quantity = quantity;
+          strcpy(newEquipment.coins.unit, unit);
 
-            // Update total weight
-            inventory->currentWeight +=
-                (newEquipment->weight * newEquipment->itemCount);
-            printf("TotalWeight: %.2f\n", inventory->currentWeight);
-
-            // Add equipment to player's inventory
-            if (inventory->equipment == NULL) {
-              inventory->equipment = newEquipment;
-              newEquipment->next = newEquipment;
-              newEquipment->prev = newEquipment;
-            } else {
-              struct Equipment *lastEquipment = inventory->equipment->prev;
-              lastEquipment->next = newEquipment;
-              newEquipment->prev = lastEquipment;
-              newEquipment->next = inventory->equipment;
-              inventory->equipment->prev = newEquipment;
-            }
-          } else {
-            printf("Memory allocation failed. Equipment transfer aborted.\n");
-            // Free previously allocated memory
-            struct Equipment *current = inventory->equipment;
-            while (current != NULL) {
-              struct Equipment *next = current->next;
-              free(current);
-              current = next;
-            }
-            fclose(campFileRead);
-            break;
-          }
+          addEquipment(inventory, &newEquipment, itemCount);
         }
         fclose(campFileRead);
         // Clear camp's inventory file after transfer
@@ -424,26 +442,6 @@ void manageInventory(struct Inventory *inventory) {
       }
       break;
     case 5:
-      // List camp's equipment
-      printf("Camp's Equipment:\n");
-      FILE *campFileList = fopen(inventory->campFile, "r");
-      if (campFileList != NULL) {
-        char name[64], unit[3];
-        int itemCount;
-        double weight;
-        int quantity;
-        while (fscanf(campFileList,
-                      " Name:%63s Item count:%d Weight:%lf Cost:%d %2s\n", name,
-                      &itemCount, &weight, &quantity, unit) == 5) {
-          printf("Name: %s, Weight: %.2f, Item Count: %d, Cost: %d %s\n", name,
-                 weight, itemCount, quantity, unit);
-        }
-        fclose(campFileList);
-      } else {
-        printf("Error: Unable to open camp log file for reading.\n");
-      }
-      break;
-    case 6:
       printf("Exiting inventory management.\n");
       exit(0);
     default:
