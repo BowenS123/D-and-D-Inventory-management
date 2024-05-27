@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
   printInventory(&inventory);
   manageInventory(&inventory);
   freeInventory(&inventory);
-  
+
   return 0;
 }
 
@@ -386,23 +386,39 @@ void manageInventory(struct Inventory *inventory) {
       printf("Transferring equipment from camp to player...\n");
       FILE *campFileRead = fopen(inventory->campFile, "r");
       if (campFileRead != NULL) {
-        char name[64], unit[3];
+        char name[64],
+            unit[4];
         int itemCount;
         double weight;
         int quantity;
-        while (fscanf(campFileRead,
-                      " Name:%63s Item count:%d Weight:%lf Cost:%d %2s\n", name,
-                      &itemCount, &weight, &quantity, unit) == 5) {
-          struct Equipment newEquipment = {0};
-          strcpy(newEquipment.name, name);
-          newEquipment.itemCount = itemCount;
-          newEquipment.weight = weight;
-          newEquipment.coins.quantity = quantity;
-          strcpy(newEquipment.coins.unit, unit);
 
-          addEquipment(inventory, &newEquipment, itemCount);
+        while (!feof(campFileRead)) {
+          int readItems = fscanf(
+              campFileRead, " Name:%63s Item count:%d Weight:%lf Cost:%d %3s",
+              name, &itemCount, &weight, &quantity, unit);
+          if (readItems == 5) {
+            struct Equipment newEquipment = {0};
+            strcpy(newEquipment.name, name);
+            newEquipment.itemCount = itemCount;
+            newEquipment.weight = weight;
+            newEquipment.coins.quantity = quantity;
+            strcpy(newEquipment.coins.unit, unit);
+
+            addEquipment(inventory, &newEquipment, itemCount);
+          } else if (readItems != EOF) {
+            // Handle incorrect format or partial reads
+            printf(
+                "Warning: Incorrect format or unexpected data in camp file.\n");
+            // Skip the rest of the line to continue reading subsequent lines
+            int c;
+            do {
+              c = fgetc(campFileRead);
+            } while (c != '\n' && c != EOF);
+          }
         }
+
         fclose(campFileRead);
+
         // Clear camp's inventory file after transfer
         FILE *campFileClear = fopen(inventory->campFile, "w");
         if (campFileClear != NULL) {
