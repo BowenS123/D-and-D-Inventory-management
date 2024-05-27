@@ -34,7 +34,7 @@ void addEquipment(struct Inventory *inventory, struct Equipment *newEquipment,
 void printInventory(struct Inventory *inventory);
 void freeInventory(struct Inventory *inventory);
 void manageInventory(struct Inventory *inventory);
-
+//./inventory -w 180.75 -m 4gp 42sp 69cp greatsword.json small-knife.json 2 waterskin.json leather-armor.json -c camp.log
 int main(int argc, char *argv[]) {
   struct Inventory inventory = {0};
   int coinIndex = 0;
@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
   printInventory(&inventory);
   manageInventory(&inventory);
   freeInventory(&inventory);
-
+  
   return 0;
 }
 
@@ -356,8 +356,8 @@ void manageInventory(struct Inventory *inventory) {
           currentEquipment->prev->next = currentEquipment->next;
           currentEquipment->next->prev = currentEquipment->prev;
           inventory->equipment = currentEquipment->next;
-          currentEquipment = currentEquipment->next;
         }
+        currentEquipment = currentEquipment->next;
         printf("Transferring equipment '%s' from player to camp...\n",
                transferEquipment->name);
         // Update total weight
