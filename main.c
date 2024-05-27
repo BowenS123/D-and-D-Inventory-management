@@ -34,7 +34,7 @@ void addEquipment(struct Inventory *inventory, struct Equipment *newEquipment,
 void printInventory(struct Inventory *inventory);
 void freeInventory(struct Inventory *inventory);
 void manageInventory(struct Inventory *inventory);
-//./inventory -w 180.75 -m 4gp 42sp 69cp greatsword.json small-knife.json 2 waterskin.json leather-armor.json -c camp.log
+//./Inventory -w 180.75 -m 4gp 42sp 69cp greatsword.json small-knife.json 2 waterskin.json leather-armor.json -c camp.log
 int main(int argc, char *argv[]) {
   struct Inventory inventory = {0};
   int coinIndex = 0;
@@ -210,7 +210,6 @@ void addEquipment(struct Inventory *inventory, struct Equipment *newEquipment,
            newEquipment->name);
   }
 
-  // Add the equipment to the inventory without copying
   newEquipment->itemCount = itemCount;
   newEquipment->next = NULL;
   newEquipment->prev = NULL;
@@ -386,8 +385,7 @@ void manageInventory(struct Inventory *inventory) {
       printf("Transferring equipment from camp to player...\n");
       FILE *campFileRead = fopen(inventory->campFile, "r");
       if (campFileRead != NULL) {
-        char name[64],
-            unit[4];
+        char name[64], unit[4];
         int itemCount;
         double weight;
         int quantity;
@@ -409,7 +407,6 @@ void manageInventory(struct Inventory *inventory) {
             // Handle incorrect format or partial reads
             printf(
                 "Warning: Incorrect format or unexpected data in camp file.\n");
-            // Skip the rest of the line to continue reading subsequent lines
             int c;
             do {
               c = fgetc(campFileRead);
